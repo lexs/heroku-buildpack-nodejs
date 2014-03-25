@@ -176,8 +176,8 @@ fi
     export_env_dir $env_dir
   fi
 
-  status "Pruning npm dev dependencies"
-  npm prune --production
+  status "Pruning development dependencies"
+  npm prune --production 2>&1 | indent
 )
 
 # Update the PATH
