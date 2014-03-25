@@ -24,7 +24,7 @@ source $bp_dir/bin/common.sh
 trap cat_npm_debug_log ERR
 
 # Look in package.json's engines.node field for a semver range
-semver_range=$(cat $build_dir/package.json | $bp_dir/vendor/jq -r .engines.node)
+semver_range=$(cat $build_dir/package.json | $jq -r .engines.node)
 
 # Resolve node version using semver.io
 node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
@@ -97,7 +97,7 @@ fi
 
   status "Installing dependencies"
   # Make npm output to STDOUT instead of its default STDERR
-  npm install --userconfig $build_dir/.npmrc --production 2>&1 | indent
+  npm install --userconfig $build_dir/.npmrc 2>&1 | indent
 )
 
 # Persist goodies like node-version in the slug
@@ -127,7 +127,7 @@ rm -rf "$build_dir/.npm"
 
 # If Procfile is absent, try to create one using `npm start`
 if [ ! -e $build_dir/Procfile ]; then
-  npm_start=$(cat $build_dir/package.json | $bp_dir/vendor/jq -r .scripts.start)
+  npm_start=$(cat $build_dir/package.json | $jq -r .scripts.start)
 
   # If `scripts.start` is set in package.json, or a server.js file
   # is present in the app root, then create a default Procfile
@@ -139,6 +139,36 @@ if [ ! -e $build_dir/Procfile ]; then
     protip "Create a Procfile or specify a start script in package.json"
   fi
 fi
+
+(
+  if [ -f $build_dir/bower.json ]; then
+    # make sure that bower is installed locally
+    npm install bower
+    status "Found bower.json, running bower install"
+    $build_dir/node_modules/.bin/bower install
+  else
+    status "No Bower.json found"
+  fi
+)
+
+# Check and run Grunt
+(
+  if [ -f $build_dir/grunt.js ] || [ -f $build_dir/Gruntfile.js ] || [ -f $build_dir/Gruntfile.coffee ]; then
+    # get the env vars
+    if [ -d "$env_dir" ]; then
+      status "Exporting config vars to environment"
+      export_env_dir $env_dir
+    fi
+
+    # make sure that grunt and grunt-cli are installed locally
+    npm install grunt-cli
+    npm install grunt
+    status "Found Gruntfile, running grunt task"
+    $build_dir/node_modules/.bin/grunt
+  else
+    status "No Gruntfile (grunt.js, Gruntfile.js, Gruntfile.coffee) found"
+  fi
+)
 
 # Update the PATH
 status "Building runtime environment"
